@@ -1,0 +1,3 @@
+NOTAS PRACTICA VA P1
+
+AdjustIntensity = Seria interesante acotar el max y min del valor de "inRange"?
