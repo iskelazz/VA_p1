@@ -27,7 +27,7 @@ def auto_kernel(n,m,valor=-1.0):
 #Ajusta la escala de grises que usa la imagen pasada por parametro
 def adjustIntensity (inImage, inRange=[], outRange=[0, 1]):
     if (inRange == []):
-        inRange = [np.amin(image),np.amax(image)]
+        inRange = [np.amin(inImage),np.amax(inImage)]
     temp = (inImage-inRange[0])/(inRange[1]-inRange[0])
     modificador = outRange[1]-outRange[0]
     resultadoFloat = temp * modificador
@@ -130,46 +130,140 @@ def highBoost(inImage,A,method,param):
 ##  3.3 MORPHOLOGICAL OPERATORS
 
 def erode (inImage, SE, center=[]):
-    return inImage ##Empty funtion
+    if (len(center) < 2 or len(center)>2):
+        center = [int(SE.shape[0]/2 + 1), int(SE.shape[1]/2 + 1)]
+    desplazamiento_pInitoCenter = center[0] - 1
+    desplazamiento_pCentertoEnd = SE.shape[0] - center[0]
+    desplazamiento_qInitoCenter = center[1] - 1
+    desplazamiento_qCentertoEnd = SE.shape[1] - center[1]
+    image_result = np.zeros([inImage.shape[0], inImage.shape[1]], inImage.dtype)
+    for x in range(inImage.shape[0]):
+        for y in range (inImage.shape[1]):
+            min = 1
+            x1 = x-desplazamiento_pInitoCenter
+            x2 = x+desplazamiento_qCentertoEnd
+            y1 = y-desplazamiento_qInitoCenter
+            y2 = y+desplazamiento_pCentertoEnd
+            if x1 < 0 or x2 > inImage.shape[0]-1 or y1 < 0 or y2 > inImage.shape[1]-1:
+                image_result[x,y] = 0
+            else:
+                local_matrix = inImage[x1:x2+1,y1:y2+1]
+                for a in range(SE.shape[0]):
+                    for b in range(SE.shape[1]):
+                        if (SE[a, b] == 1):
+                            if(local_matrix[a, b] < min):
+                                min = local_matrix[a,b]
+                image_result[x,y] = min
+    return image_result
 
-def dilate (inImage, SE, center=[]):
-    return inImage ##Empty funtion    
+def dilate(inImage, SE, center=[]):
+    if (len(center) < 2 or len(center)>2):
+        center = [int(SE.shape[0]/2 + 1), int(SE.shape[1]/2 + 1)]
+    desplazamiento_pInitoCenter = center[0] - 1
+    desplazamiento_pCentertoEnd = SE.shape[0] - center[0]
+    desplazamiento_qInitoCenter = center[1] - 1
+    desplazamiento_qCentertoEnd = SE.shape[1] - center[1]
+    image_result = np.zeros([inImage.shape[0], inImage.shape[1]], inImage.dtype)
+    for x in range(inImage.shape[0]):
+        for y in range (inImage.shape[1]):
+            max = 0
+            x1 = x-desplazamiento_pInitoCenter
+            x2 = x+desplazamiento_qCentertoEnd
+            y1 = y-desplazamiento_qInitoCenter
+            y2 = y+desplazamiento_pCentertoEnd
+            se_x1 = 0
+            se_x2 = SE.shape[0]
+            se_y1 = 0
+            se_y2 = SE.shape[1]
+
+            if x1 < 0:
+                se_x1 = -x1
+                x1 = 0
+            if x2 > inImage.shape[0]-1:
+                se_x2 = se_x2 - (x2 - (inImage.shape[0]-1))
+                x2 = inImage.shape[0]-1
+            if y1 < 0:
+                se_y1 = -y1
+                y1 = 0
+            if y2 > inImage.shape[1]-1:
+                se_y2 = se_y2 - (y2 - (inImage.shape[1]-1))
+                y2 = inImage.shape[1]-1
+            local_matrix = inImage[x1:x2+1,y1:y2+1]
+            temporal_SE = SE[se_x1:se_x2,se_y1:se_y2]
+            for a in range(temporal_SE.shape[0]):
+                for b in range(temporal_SE.shape[1]):
+                    if (SE[a, b] == 1):
+                        if(local_matrix[a, b] > max):
+                            max = local_matrix[a,b]
+            image_result[x,y] = max
+    return image_result
 
 def opening (inImage, SE, center=[]):
-    return inImage ##Empty funtion  
+    erode_image = erode(inImage,SE,center)
+    image_result = dilate(erode_image,SE,center)
+    return image_result  
 
 def closing (inImage, SE, center=[]):
-    return inImage ##Empty funtion  
+    dilate_image = dilate(inImage,SE,center)
+    image_result = erode(dilate_image,SE,center)
+    return image_result  
+
+
+def fill (inImage, seeds, SE=[], center=[]):
+    if (len(SE) < 1): 
+        SE = np.array([[0,1,0],[1, 1, 1],[0, 1, 0]])
+    if (len(center) < 2 or len(center)>2):
+        center = [int(SE.shape[0]/2 + 1), int(SE.shape[1]/2 + 1)]   
+    stack = set(((seeds[0][0], seeds[0][1]),))
+    desplazamiento_pInitoCenter = center[0] - 1
+    desplazamiento_pCentertoEnd = SE.shape[0] - center[0]
+    desplazamiento_qInitoCenter = center[1] - 1
+    desplazamiento_qCentertoEnd = SE.shape[1] - center[1]
+    image_result = np.array(inImage, copy=True)
+    if (inImage.dtype == "uint8"): newColor=255
+    else: newColor=1
+    count = 0 
+    for x in range(0, len(seeds)):
+        if (255 == inImage[seeds[x][0],seeds[x][1]]): continue
+        stack.add((seeds[x][0], seeds[x][1]))
+        while (stack):    
+            new_pos_x,new_pos_y = stack.pop()
+            if (inImage[new_pos_x,new_pos_y]!=inImage[seeds[x][0],seeds[x][1]]): continue
+            else: image_result[new_pos_x,new_pos_y]=newColor
+            x1 = new_pos_x-desplazamiento_pInitoCenter
+            x2 = new_pos_x+desplazamiento_qCentertoEnd
+            y1 = new_pos_y-desplazamiento_qInitoCenter
+            y2 = new_pos_y+desplazamiento_pCentertoEnd
+            local_matrix = image_result[x1:x2+1,y1:y2+1]
+            if x1 < 0 or x2 > inImage.shape[0]-1 or y1 < 0 or y2 > inImage.shape[1]-1:
+                    continue
+            for a in range(SE.shape[0]):
+                for b in range(SE.shape[1]):
+                    if (SE[a, b] == 1):
+                        if(local_matrix[a,b]==inImage[seeds[x][0],seeds[x][1]]):
+                            pos1 = a-desplazamiento_pInitoCenter
+                            pos2 = b-desplazamiento_qInitoCenter
+                            if (pos1 != 0 or pos2 != 0):
+                                count = count +1 
+                                stack.add((new_pos_x+pos1,new_pos_y+pos2))
+
+    return image_result
+
+
+def gradientImage (inImage, operator):
+    return inImage # Por desarrollar
+
+def edgeCanny (inImage, sigma, tlow, thigh):
+    return inImage # Por desarrollar
 
 # Load
-image_path = 'PruebaVA/Captura.png'
-image = cv2.imread(image_path,cv2.IMREAD_GRAYSCALE)
-image_float = image/255
-# Show image
-cv2.imshow('Image', image_float)
+img = cv2.imread("PruebaVA/circles.png", cv2.IMREAD_GRAYSCALE)
+img_float = img/255
+filter_size = 9
+SE = np.array([[1,1,1],[1, 1, 1],[1, 1, 1]])
+new_img = fill(img_float, [[150,150],[395,395]],SE=SE) #[100,100]
+cv2.imshow('image', img)
 cv2.waitKey(0)
-
-rango = [np.amin(image),np.amax(image)]
-print(rango)
-
-normalizeImage = highBoost(image_float,1,'median',7)
-mask_image = highBoost(image_float,7,'median',7)
-
-
-rango2 = [np.amin(normalizeImage),np.amax(normalizeImage)]
-print(rango2)
-
-rango4 = [np.amin(mask_image),np.amax(mask_image)]
-print(rango4)
-
-cv2.imshow('normalizeImage', normalizeImage)
+cv2.imshow('Imageorigi', new_img)
 cv2.waitKey(0)
-
-cv2.imshow('mask', mask_image)
-cv2.waitKey(0)
-"""norhist,bins = np.histogram(normalizeImage,256,(0,255))
-plt.plot(norhist)
-plt.xlim([0, 255])
-plt.show()"""
-
 cv2.destroyAllWindows()
