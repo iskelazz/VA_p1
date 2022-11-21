@@ -129,6 +129,7 @@ def highBoost(inImage,A,method,param):
 
 ##  3.3 MORPHOLOGICAL OPERATORS
 
+## Funcion que analiza los vecinos de un pixel y establece en ese pixel el menor valor encontrado entre ellos. Puede dar algún problema en los margenes, mirar eso. Equivalente a cv2.erode
 def erode (inImage, SE, center=[]):
     if (len(center) < 2 or len(center)>2):
         center = [int(SE.shape[0]/2 + 1), int(SE.shape[1]/2 + 1)]
@@ -156,6 +157,7 @@ def erode (inImage, SE, center=[]):
                 image_result[x,y] = min
     return image_result
 
+## Funcion que analiza los vecinos de un pixel y establece en ese pixel el mayor valor encontrado entre ellos. Equivale a cv2.dilate
 def dilate(inImage, SE, center=[]):
     if (len(center) < 2 or len(center)>2):
         center = [int(SE.shape[0]/2 + 1), int(SE.shape[1]/2 + 1)]
@@ -175,7 +177,7 @@ def dilate(inImage, SE, center=[]):
             se_x2 = SE.shape[0]
             se_y1 = 0
             se_y2 = SE.shape[1]
-
+            # Analiza margenes y corrige si se sale de ellos
             if x1 < 0:
                 se_x1 = -x1
                 x1 = 0
@@ -198,17 +200,19 @@ def dilate(inImage, SE, center=[]):
             image_result[x,y] = max
     return image_result
 
+#Consiste en aplicar erode y luego dilate sobre el resultado
 def opening (inImage, SE, center=[]):
     erode_image = erode(inImage,SE,center)
     image_result = dilate(erode_image,SE,center)
     return image_result  
 
+#Consiste en aplicar dilate y luego erode sobre el resultado
 def closing (inImage, SE, center=[]):
     dilate_image = dilate(inImage,SE,center)
     image_result = erode(dilate_image,SE,center)
     return image_result  
 
-
+#El objetivo de esta funcion es rellenar huecos con un color (blanco en este caso). Valida para imagenes "uint8" ademas de para los valores de entre [0,1]
 def fill (inImage, seeds, SE=[], center=[]):
     if (len(SE) < 1): 
         SE = np.array([[0,1,0],[1, 1, 1],[0, 1, 0]])
@@ -250,20 +254,129 @@ def fill (inImage, seeds, SE=[], center=[]):
     return image_result
 
 
+##  3.4 EDGE DETECTION
+
+def sobel (inImage):
+    kernel_x = np.array([[-1,0,1],[-2, 0, 2],[-1, 0, 1]])
+    kernel_y = np.array([[-1,-2,-1],[0, 0, 0],[1, 2, 1]])
+    return filterImage(inImage,kernel_y),filterImage(inImage,kernel_x)
+
+def prewitt (inImage):
+    kernel_x = np.array([[1,1,1],[0,0,0],[-1,-1,-1]])
+    kernel_y = np.array([[-1,0,1],[-1,0,1],[-1,0,1]])
+    return filterImage(inImage,kernel_y),filterImage(inImage,kernel_x)
+
+#Revisar si hacerlo con mascara 3x3
+def roberts (inImage):
+    kernel_x = np.array([[1,0],[0,-1]])
+    kernel_y = np.array([[0,1],[-1,0]])
+    return filterImage(inImage,kernel_y),filterImage(inImage,kernel_x)
+
+def centralDiff(inImage):
+    kernel_x = np.array([[0,1,0],[0,0,0],[0, -1, 0]])
+    kernel_y = np.array([[0, 0, 0],[-1, 0, 1],[0, 0, 0]])
+    return filterImage(inImage,kernel_y),filterImage(inImage,kernel_x)
+
 def gradientImage (inImage, operator):
-    return inImage # Por desarrollar
+    if (operator=="Roberts"): return roberts(inImage)
+    if (operator=="CentralDiff"): return centralDiff(inImage)
+    if (operator=="Prewitt"): return prewitt(inImage)
+    if (operator=="Sobel"): return sobel(inImage)
+    raise ValueError("El operador pasado por parámetro no es válido")
+
+
+def nonMaximumSuppression(inImage, orientationMatrix):
+    height, width = inImage.shape
+    result_image = np.zeros((height,width), dtype=np.float64)
+    
+    for x in range(height):
+        for y in range(width):
+            maxNeighbourA = 1
+            maxNeighbourB = 1
+            max = 1
+
+            if (0 <= orientationMatrix[x,y] < 22.5) or (157.5 <= orientationMatrix[x,y] <= 180):
+                if ((y+1)<width): maxNeighbourA = inImage[x, y + 1]
+                if ((y-1)>0): maxNeighbourB = inImage[x, y - 1]
+            
+            if (22.5 <= orientationMatrix[x,y] < 67.5):
+                if (((y-1)>0) and ((x-1)>0)): maxNeighbourA = inImage[x-1,y-1]
+                if (((y+1)<width) and ((x+1)<height)): maxNeighbourB = inImage[x+1,y+1]
+
+            if (67.5 <= orientationMatrix[x, y] < 112.5):
+                if ((x+1)<height): maxNeighbourA = inImage[x + 1, y]
+                if ((x-1)>0): maxNeighbourB = inImage[x - 1, y]
+
+            if (112.5 <= orientationMatrix[x, y] < 157.5):
+                if (((y-1)>0) and ((x+1)<height)): maxNeighbourA = inImage[x+1,y-1]
+                if (((x-1)>0) and ((y+1)<width)): maxNeighbourB = inImage[x-1,y+1]
+
+
+            if (maxNeighbourA>maxNeighbourB): max = maxNeighbourA
+            else: max = maxNeighbourB
+
+            if (inImage[x,y] >= max): result_image[x,y] = inImage[x,y]
+            else: result_image[x,y] = 0
+   
+    return result_image
+
+def threshold (inImage, tlow, thigh):
+    
+    height, width = inImage.shape
+    result_image = np.zeros((height,width), dtype=np.float64)
+    for x in range (height):
+        for y in range (width):
+            if (inImage[x,y] >= thigh): result_image[x,y] = 1
+            elif (inImage[x,y] < tlow): result_image[x,y] = 0
+            else: result_image[x,y] = 0.5   
+
+    return result_image
+
+def hysteresis(inImage):
+    height, width = inImage.shape
+    SE = np.array([[1,1,1],[1, 1, 1],[1, 1, 1]])
+    for x in range(height-1):
+        for y in range(width-1):
+            if(inImage[x,y] == 0.5):
+                if 1 in [inImage[x,y-1],inImage[x,y+1],inImage[x+1,y-1],inImage[x+1,y],inImage[x+1,y+1], 
+                    inImage[x-1,y-1],inImage[x-1,y],inImage[x-1,y+1]]:
+                        inImage = fill(inImage,seeds=[[x,y]],SE=SE)
+                else:
+                    inImage[x,y] = 0
+    return inImage #Por desarrollar
+
 
 def edgeCanny (inImage, sigma, tlow, thigh):
-    return inImage # Por desarrollar
+    #Suavizado para quitar el ruido
+    smoothImage = gaussianFilter(inImage, sigma)
+    #Gradientes de la imagen suavizada
+    Image_Gy, Image_Gx = sobel(smoothImage)
+    Image_G = np.sqrt((Image_Gx**2)+(Image_Gy**2))
+    G_direction = np.arctan2(Image_Gy,Image_Gx)
+    angle = (G_direction * 180 /np.pi)%180
+    #Non-Maximum Suppression para "adelgazar" los bordes
+    result = nonMaximumSuppression(Image_G,angle)
+    #Umbralizacion para definir los roles de cada pixel
+    result = hysteresis (threshold(result,tlow,thigh))
+    return result # Por desarrollar, falta hysterisis
 
 # Load
-img = cv2.imread("PruebaVA/circles.png", cv2.IMREAD_GRAYSCALE)
+img = cv2.imread("PruebaVA/emma.png", cv2.IMREAD_GRAYSCALE)
 img_float = img/255
 filter_size = 9
-SE = np.array([[1,1,1],[1, 1, 1],[1, 1, 1]])
-new_img = fill(img_float, [[150,150],[395,395]],SE=SE) #[100,100]
-cv2.imshow('image', img)
+gx = cv2.Canny(img,25,40,L2gradient=False)
+gxf = edgeCanny(img_float,1,0.04,thigh =0.3)
+
+cv2.imshow('Imageorigi', img)
 cv2.waitKey(0)
-cv2.imshow('Imageorigi', new_img)
+cv2.imshow('gx', gx)
 cv2.waitKey(0)
+cv2.imshow('gxf', gxf)
+cv2.waitKey(0)
+cv2.imshow('gxy', gxy)
+cv2.waitKey(0)
+#cv2.imshow('gy', img_prewitty)
+#cv2.waitKey(0)
+#cv2.imshow('gxy', gxy)
+#cv2.waitKey(0)
 cv2.destroyAllWindows()
