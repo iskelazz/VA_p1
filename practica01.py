@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-from skimage import exposure, feature, filters, transform, morphology
+import os
 import math
 
 ##   SUPPORT OPERATIONS
@@ -22,6 +22,22 @@ def auto_kernel(n,m,valor=-1.0):
          return np.ones((n, m), dtype="float") * valor
     return np.ones((n, m), dtype="float") * (1.0 / (n * m))
 
+def load_image(path):
+    image_int = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    return image_int/255
+
+def plot_image(tagPlot,inImage):
+    cv2.imshow(tagPlot, inImage)
+    cv2.waitKey(0)
+
+# Renormalizar valores que se salgan de escala para la salida?
+def save_image (name,inImage):
+    print(name)
+    path = os.path.join(os.getcwd(), name)
+    print(path)
+    inImage = np.round(inImage*255).astype(np.uint8)
+    cv2.imwrite(path,inImage)
+
 ##  3.1 HISTOGRAM: CONTRAST ENHANCEMENT
 
 #Ajusta la escala de grises que usa la imagen pasada por parametro
@@ -38,7 +54,7 @@ def adjustIntensity (inImage, inRange=[], outRange=[0, 1]):
 def equalizeIntensity(inImage, nBins=256):
     width,height = inImage.shape
     hist,bins = np.histogram(inImage,nBins,(0,1))
-    plot_grayhist(hist,bins)
+    #plot_grayhist(hist,bins)
     size=width*height
     percent_hist = hist/size
     acum=[]
@@ -120,7 +136,7 @@ def highBoost(inImage,A,method,param):
         blur_image = gaussianFilter(inImage,param)
     else:
         if (method == 'median'):
-            blur_image = medianFilter(inImage,param)
+            blur_image = medianFilter(inImage,int(param))
         else:
              raise ValueError("Método no válido")
     mask = inImage - blur_image
@@ -266,10 +282,9 @@ def prewitt (inImage):
     kernel_y = np.array([[-1,0,1],[-1,0,1],[-1,0,1]])
     return filterImage(inImage,kernel_y),filterImage(inImage,kernel_x)
 
-#Revisar si hacerlo con mascara 3x3
 def roberts (inImage):
-    kernel_x = np.array([[1,0],[0,-1]])
-    kernel_y = np.array([[0,1],[-1,0]])
+    kernel_x = np.array([[0,0,0],[0,1,0],[0,0,-1]])
+    kernel_y = np.array([[0,0,0],[0,0,1],[0,-1,0]])
     return filterImage(inImage,kernel_y),filterImage(inImage,kernel_x)
 
 def centralDiff(inImage):
@@ -343,7 +358,7 @@ def hysteresis(inImage):
                         inImage = fill(inImage,seeds=[[x,y]],SE=SE)
                 else:
                     inImage[x,y] = 0
-    return inImage #Por desarrollar
+    return inImage 
 
 
 def edgeCanny (inImage, sigma, tlow, thigh):
@@ -356,27 +371,8 @@ def edgeCanny (inImage, sigma, tlow, thigh):
     angle = (G_direction * 180 /np.pi)%180
     #Non-Maximum Suppression para "adelgazar" los bordes
     result = nonMaximumSuppression(Image_G,angle)
-    #Umbralizacion para definir los roles de cada pixel
+    #Umbralizacion para definir los roles de cada pixel, definir pixeles debiles
     result = hysteresis (threshold(result,tlow,thigh))
-    return result # Por desarrollar, falta hysterisis
+    return result 
 
 # Load
-img = cv2.imread("PruebaVA/emma.png", cv2.IMREAD_GRAYSCALE)
-img_float = img/255
-filter_size = 9
-gx = cv2.Canny(img,25,40,L2gradient=False)
-gxf = edgeCanny(img_float,1,0.04,thigh =0.3)
-
-cv2.imshow('Imageorigi', img)
-cv2.waitKey(0)
-cv2.imshow('gx', gx)
-cv2.waitKey(0)
-cv2.imshow('gxf', gxf)
-cv2.waitKey(0)
-cv2.imshow('gxy', gxy)
-cv2.waitKey(0)
-#cv2.imshow('gy', img_prewitty)
-#cv2.waitKey(0)
-#cv2.imshow('gxy', gxy)
-#cv2.waitKey(0)
-cv2.destroyAllWindows()
