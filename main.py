@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
     ### python3 main.py <Ruta_imagen> highBoost --A valor --method valor --param valor
     if (sys.argv[2] == "highBoost"):
-        parser.add_argument('--A',action="store",dest="amplify",type=int)
+        parser.add_argument('--A',action="store",dest="amplify",type=float)
         parser.add_argument('--method',action="store",dest="method",type=str)
         parser.add_argument('--param',action="store",dest="param",type=float)
         if (sys.argv.__contains__("--A") and  sys.argv.__contains__("--method") and sys.argv.__contains__("--param")):
@@ -214,10 +214,12 @@ if __name__ == '__main__':
             exit(-1)
 
     
-    if (args.plot): 
+    if (sys.argv.__contains__("--plot")): 
         #Imagen de entrada
         plot_image("imagenEntrada",img_float)
         #Imagen de salida
         plot_image("imagenSalida",response_image)
-    if (image_out==True): save_image(args.image_output,response_image)
+    if (image_out==True): 
+        args = parser.parse_args(sys.argv[3:])
+        save_image(args.image_output,response_image)
     cv2.destroyAllWindows()

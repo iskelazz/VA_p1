@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 import math
+from skimage import img_as_ubyte, exposure
 
 ##   SUPPORT OPERATIONS
 
@@ -23,19 +24,28 @@ def auto_kernel(n,m,valor=-1.0):
     return np.ones((n, m), dtype="float") * (1.0 / (n * m))
 
 def load_image(path):
-    image_int = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    image_int = cv2.imread(path, cv2.IMREAD_GRAYSCALE)    
     return image_int/255
 
 def plot_image(tagPlot,inImage):
     cv2.imshow(tagPlot, inImage)
     cv2.waitKey(0)
 
+def fixRanges(inImage):
+    width, height = inImage.shape
+    for x in range(0,width):
+        for y in range(0,height):
+            if (inImage[x,y] > 1): inImage[x,y] = 1
+            if (inImage[x,y] < 0): inImage[x,y] = 0
+    return inImage
+
+
 # Renormalizar valores que se salgan de escala para la salida?
 def save_image (name,inImage):
     print(name)
     path = os.path.join(os.getcwd(), name)
-    print(path)
-    inImage = np.round(inImage*255).astype(np.uint8)
+    inImage = fixRanges(inImage)
+    inImage=img_as_ubyte(inImage)
     cv2.imwrite(path,inImage)
 
 ##  3.1 HISTOGRAM: CONTRAST ENHANCEMENT
@@ -54,7 +64,7 @@ def adjustIntensity (inImage, inRange=[], outRange=[0, 1]):
 def equalizeIntensity(inImage, nBins=256):
     width,height = inImage.shape
     hist,bins = np.histogram(inImage,nBins,(0,1))
-    #plot_grayhist(hist,bins)
+    plot_grayhist(hist,bins)
     size=width*height
     percent_hist = hist/size
     acum=[]
@@ -161,12 +171,27 @@ def erode (inImage, SE, center=[]):
             x2 = x+desplazamiento_qCentertoEnd
             y1 = y-desplazamiento_qInitoCenter
             y2 = y+desplazamiento_pCentertoEnd
-            if x1 < 0 or x2 > inImage.shape[0]-1 or y1 < 0 or y2 > inImage.shape[1]-1:
-                image_result[x,y] = 0
-            else:
-                local_matrix = inImage[x1:x2+1,y1:y2+1]
-                for a in range(SE.shape[0]):
-                    for b in range(SE.shape[1]):
+            se_x1 = 0
+            se_x2 = SE.shape[0]
+            se_y1 = 0
+            se_y2 = SE.shape[1]
+            # Analiza margenes y corrige si se sale de ellos
+            if x1 < 0:
+                se_x1 = -x1
+                x1 = 0
+            if x2 > inImage.shape[0]-1:
+                se_x2 = se_x2 - (x2 - (inImage.shape[0]-1))
+                x2 = inImage.shape[0]-1
+            if y1 < 0:
+                se_y1 = -y1
+                y1 = 0
+            if y2 > inImage.shape[1]-1:
+                se_y2 = se_y2 - (y2 - (inImage.shape[1]-1))
+                y2 = inImage.shape[1]-1
+            local_matrix = inImage[x1:x2+1,y1:y2+1]
+            temporal_SE = SE[se_x1:se_x2,se_y1:se_y2]
+            for a in range(temporal_SE.shape[0]):
+                for b in range(temporal_SE.shape[1]):
                         if (SE[a, b] == 1):
                             if(local_matrix[a, b] < min):
                                 min = local_matrix[a,b]
@@ -375,4 +400,3 @@ def edgeCanny (inImage, sigma, tlow, thigh):
     result = hysteresis (threshold(result,tlow,thigh))
     return result 
 
-# Load

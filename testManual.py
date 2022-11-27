@@ -5,10 +5,10 @@ PATH = "PruebaVA/circles.png"
 img = load_image(PATH)
 
 # adjustIntensity
-responseImage = adjustIntensity(img)
+#responseImage = adjustIntensity(img)
 
 # equalizeIntensity
-#responseImage = equalizeIntensity(img)
+responseImage = equalizeIntensity(img,10)
 
 # filterImage
 #kernel = auto_kernel(3,3)
