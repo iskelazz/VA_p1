@@ -3,7 +3,7 @@ from practica01 import *
 PATH = "PruebaVA/circles.png"
 
 img = load_image(PATH)
-
+# lo
 # adjustIntensity
 #responseImage = adjustIntensity(img)
 
